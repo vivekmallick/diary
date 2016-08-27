@@ -144,6 +144,7 @@ def compile_main_file(diaryprefs) :
 def show_main_file(diaryprefs) :
     run_command(['zathura', diaryprefs.diary_path + 'main.pdf'])
 
+
 dp = Diary_Prefs(edit='vim')
 
 check_and_create_main(dp)
