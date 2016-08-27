@@ -3,6 +3,7 @@
 import os
 import subprocess
 import time
+import Crypto.Cipher.AES
 
 def set_default_editor() :
     """Sets the default editor."""
@@ -145,6 +146,29 @@ def show_main_file(diaryprefs) :
     run_command(['zathura', diaryprefs.diary_path + 'main.pdf'])
 
 
+def encrypt_message(rawstr, passphrase, iv) :
+    aes_block_size = Crypto.Cipher.AES.block_size
+
+    # blocksize should divide length of messsage:
+    padstrln = aes_block_size - (len(rawstr) % aes_block_size)
+    rawstr = rawstr + ' ' * padstrln
+
+    passlen = len(passphrase)
+    if passlen > aes_block_size :
+        passphrasenew = passphrase[:aes_block_size]
+    else :
+        padsize = aes_block_size - (passlen % aes_block_size)
+        passphrasenew = passphrase + ' ' * padsize
+
+    aes = Crypto.Cipher.AES.new(passphrasenew, Crypto.Cipher.AES.MODE_CBC, iv)
+    cipher = aes.encrypt(rawstr)
+    return cipher
+
+
+    print passlen
+    print rawstr, aes_block_size, len(rawstr)
+    print passphrasenew, aes_block_size, len(passphrasenew)
+
 dp = Diary_Prefs(edit='vim')
 
 check_and_create_main(dp)
@@ -152,3 +176,4 @@ get_diary_entry(dp)
 check_and_create_main(dp)
 compile_main_file(dp)
 show_main_file(dp)
+print encrypt_message('Hello Uma!', 'abcdef', 'abcdefghijklmnop')
