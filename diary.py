@@ -164,10 +164,25 @@ def encrypt_message(rawstr, passphrase, iv) :
     cipher = aes.encrypt(rawstr)
     return cipher
 
+def decrypt_message(cryptstr, passphrase, iv) :
+    aes_block_size = Crypto.Cipher.AES.block_size
 
-    print passlen
-    print rawstr, aes_block_size, len(rawstr)
-    print passphrasenew, aes_block_size, len(passphrasenew)
+    # blocksize should divide length of messsage:
+    # padstrln = aes_block_size - (len(rawstr) % aes_block_size)
+    # rawstr = rawstr + ' ' * padstrln
+
+    passlen = len(passphrase)
+    if passlen > aes_block_size :
+        passphrasenew = passphrase[:aes_block_size]
+    else :
+        padsize = aes_block_size - (passlen % aes_block_size)
+        passphrasenew = passphrase + ' ' * padsize
+
+    aes = Crypto.Cipher.AES.new(passphrasenew, Crypto.Cipher.AES.MODE_CBC, iv)
+    rawstr = aes.decrypt(cryptstr)
+    return rawstr
+
+
 
 dp = Diary_Prefs(edit='vim')
 
@@ -176,4 +191,4 @@ get_diary_entry(dp)
 check_and_create_main(dp)
 compile_main_file(dp)
 show_main_file(dp)
-print encrypt_message('Hello Uma!', 'abcdef', 'abcdefghijklmnop')
+print decrypt_message(encrypt_message('Hello Uma!', 'abcdef', 'abcdefghijklmnop'), 'abcdef', 'abcdefghijklmnop')
