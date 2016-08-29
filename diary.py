@@ -183,12 +183,32 @@ def decrypt_message(cryptstr, passphrase, iv) :
     return rawstr
 
 
+def encrypt_file(raw_file, crypt_file, passphrase, iv) :
+    with open(raw_file, 'r') as rf :
+        with open(crypt_file, 'w') as cf :
+            contents = rf.read()
+            print "encrypt_file: debug: \n", contents
+            cf.write(encrypt_message(contents, passphrase, iv))
+
+def decrypt_file(crypt_file, raw_file, passphrase, iv) :
+    with open(crypt_file, 'r') as cf :
+        with open(raw_file, 'w') as rf :
+            cryptcont = cf.read()
+            rf.write(decrypt_message(cryptcont, passphrase, iv))
+
 
 dp = Diary_Prefs(edit='vim')
+
+iv = 'These are great ciphers. Do you use them? You should.'
+iv = iv[4:20]
+pp = raw_input('passphrase: ')
 
 check_and_create_main(dp)
 get_diary_entry(dp)
 check_and_create_main(dp)
 compile_main_file(dp)
 show_main_file(dp)
-print decrypt_message(encrypt_message('Hello Uma!', 'abcdef', 'abcdefghijklmnop'), 'abcdef', 'abcdefghijklmnop')
+
+print decrypt_message(encrypt_message('Hello Uma!', pp, iv), pp, iv)
+encrypt_file('test.txt', 'crypt.txt', pp, iv)
+decrypt_file('crypt.txt', 'test1.txt', pp, iv)
