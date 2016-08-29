@@ -24,6 +24,63 @@ def set_diary_path() :
     diary_path = oshome + '/.vivek/diary/'
     return diary_path
 
+def encrypt_message(rawstr, passphrase, iv) :
+    aes_block_size = Crypto.Cipher.AES.block_size
+
+    # blocksize should divide length of messsage:
+    padstrln = aes_block_size - (len(rawstr) % aes_block_size)
+    rawstr = rawstr + ' ' * padstrln
+
+    passlen = len(passphrase)
+    if passlen > aes_block_size :
+        passphrasenew = passphrase[:aes_block_size]
+    else :
+        padsize = aes_block_size - (passlen % aes_block_size)
+        passphrasenew = passphrase + ' ' * padsize
+
+    aes = Crypto.Cipher.AES.new(passphrasenew, Crypto.Cipher.AES.MODE_CBC, iv)
+    cipher = aes.encrypt(rawstr)
+    return cipher
+
+def decrypt_message(cryptstr, passphrase, iv) :
+    aes_block_size = Crypto.Cipher.AES.block_size
+
+    # blocksize should divide length of messsage:
+    # padstrln = aes_block_size - (len(rawstr) % aes_block_size)
+    # rawstr = rawstr + ' ' * padstrln
+
+    passlen = len(passphrase)
+    if passlen > aes_block_size :
+        passphrasenew = passphrase[:aes_block_size]
+    else :
+        padsize = aes_block_size - (passlen % aes_block_size)
+        passphrasenew = passphrase + ' ' * padsize
+
+    aes = Crypto.Cipher.AES.new(passphrasenew, Crypto.Cipher.AES.MODE_CBC, iv)
+    rawstr = aes.decrypt(cryptstr)
+    return rawstr
+
+
+def encrypt_file(raw_file, crypt_file, passphrase, iv) :
+    """
+    Encrypt raw_file into crypt_file
+    """
+    with open(raw_file, 'r') as rf :
+        with open(crypt_file, 'w') as cf :
+            contents = rf.read()
+            print "encrypt_file: debug: \n", contents
+            cf.write(encrypt_message(contents, passphrase, iv))
+
+def decrypt_file(crypt_file, raw_file, passphrase, iv) :
+    """
+    Decrypt raw_file into crypt_file
+    """
+    with open(crypt_file, 'r') as cf :
+        with open(raw_file, 'w') as rf :
+            cryptcont = cf.read()
+            rf.write(decrypt_message(cryptcont, passphrase, iv))
+
+
 class Diary_Prefs :
     def __init__(cls, edit='default', diary_path='default') :
         if edit == 'default' :
@@ -121,10 +178,11 @@ def check_and_create_main (diaryprefs) :
                 for line in mf :
                     mfl.write(line)
 
-def get_diary_entry(diaryprefs) :
+def get_diary_entry(diaryprefs, passphrase, iv) :
     maindata = diaryprefs.diary_path + 'maindata.lst'
     timestamp = extract_time_file_name()
     diary_file = diaryprefs.diary_path + timestamp + '.tex'
+    diary_crypt = diaryprefs.diary_path + timestamp + '.txc'
 
     print "Writing in:", diary_file
 
@@ -136,65 +194,36 @@ def get_diary_entry(diaryprefs) :
     with open(maindata, 'a') as md :
         md.write(timestamp + '\n')
 
-def compile_main_file(diaryprefs) :
+    encrypt_file(diary_file, diary_crypt, passphrase, iv)
+    os.remove(diary_file)
+
+
+def compile_main_file(diaryprefs, passphrase, iv) :
+    maindata = diaryprefs.diary_path + 'maindata.lst'
+    with open(maindata, 'r') as md :
+        for fn in md :
+            fn = fn.strip()
+            print fn
+            flname = diaryprefs.diary_path + fn + '.txc'
+            texname = diaryprefs.diary_path + fn + '.tex'
+            decrypt_file(flname, texname, passphrase, iv)
+
     curr_dir = os.getcwd()
     os.chdir(diaryprefs.diary_path)
+
     run_command(['fulltex', 'main.tex'])
     os.chdir(curr_dir)
 
+    with open(maindata, 'r') as md :
+        for fn in md :
+            fn = fn.strip()
+            os.remove(diaryprefs.diary_path + fn + '.tex')
+
+
 def show_main_file(diaryprefs) :
-    run_command(['zathura', diaryprefs.diary_path + 'main.pdf'])
-
-
-def encrypt_message(rawstr, passphrase, iv) :
-    aes_block_size = Crypto.Cipher.AES.block_size
-
-    # blocksize should divide length of messsage:
-    padstrln = aes_block_size - (len(rawstr) % aes_block_size)
-    rawstr = rawstr + ' ' * padstrln
-
-    passlen = len(passphrase)
-    if passlen > aes_block_size :
-        passphrasenew = passphrase[:aes_block_size]
-    else :
-        padsize = aes_block_size - (passlen % aes_block_size)
-        passphrasenew = passphrase + ' ' * padsize
-
-    aes = Crypto.Cipher.AES.new(passphrasenew, Crypto.Cipher.AES.MODE_CBC, iv)
-    cipher = aes.encrypt(rawstr)
-    return cipher
-
-def decrypt_message(cryptstr, passphrase, iv) :
-    aes_block_size = Crypto.Cipher.AES.block_size
-
-    # blocksize should divide length of messsage:
-    # padstrln = aes_block_size - (len(rawstr) % aes_block_size)
-    # rawstr = rawstr + ' ' * padstrln
-
-    passlen = len(passphrase)
-    if passlen > aes_block_size :
-        passphrasenew = passphrase[:aes_block_size]
-    else :
-        padsize = aes_block_size - (passlen % aes_block_size)
-        passphrasenew = passphrase + ' ' * padsize
-
-    aes = Crypto.Cipher.AES.new(passphrasenew, Crypto.Cipher.AES.MODE_CBC, iv)
-    rawstr = aes.decrypt(cryptstr)
-    return rawstr
-
-
-def encrypt_file(raw_file, crypt_file, passphrase, iv) :
-    with open(raw_file, 'r') as rf :
-        with open(crypt_file, 'w') as cf :
-            contents = rf.read()
-            print "encrypt_file: debug: \n", contents
-            cf.write(encrypt_message(contents, passphrase, iv))
-
-def decrypt_file(crypt_file, raw_file, passphrase, iv) :
-    with open(crypt_file, 'r') as cf :
-        with open(raw_file, 'w') as rf :
-            cryptcont = cf.read()
-            rf.write(decrypt_message(cryptcont, passphrase, iv))
+    pdffile = diaryprefs.diary_path + 'main.pdf'
+    run_command(['zathura', pdffile])
+    os.remove(pdffile)
 
 
 dp = Diary_Prefs(edit='vim')
@@ -204,11 +233,8 @@ iv = iv[4:20]
 pp = raw_input('passphrase: ')
 
 check_and_create_main(dp)
-get_diary_entry(dp)
+get_diary_entry(dp, pp, iv)
 check_and_create_main(dp)
-compile_main_file(dp)
+compile_main_file(dp, pp, iv)
 show_main_file(dp)
 
-print decrypt_message(encrypt_message('Hello Uma!', pp, iv), pp, iv)
-encrypt_file('test.txt', 'crypt.txt', pp, iv)
-decrypt_file('crypt.txt', 'test1.txt', pp, iv)
