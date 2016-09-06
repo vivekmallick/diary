@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 import subprocess
 import time
 import Crypto.Cipher.AES
@@ -68,7 +69,7 @@ def encrypt_file(raw_file, crypt_file, passphrase, iv) :
     with open(raw_file, 'r') as rf :
         with open(crypt_file, 'w') as cf :
             contents = rf.read()
-            print "encrypt_file: debug: \n", contents
+            # print "encrypt_file: debug: \n", contents
             cf.write(encrypt_message(contents, passphrase, iv))
 
 def decrypt_file(crypt_file, raw_file, passphrase, iv) :
@@ -197,6 +198,53 @@ def get_diary_entry(diaryprefs, passphrase, iv) :
     encrypt_file(diary_file, diary_crypt, passphrase, iv)
     os.remove(diary_file)
 
+def create_temp_main(diaryprefs, timestamp) :
+    tempmain = diaryprefs.diary_path + 'tempmain.tex'
+    mainhead = diaryprefs.diary_path + 'mainhead.tem'
+    mainfoot = diaryprefs.diary_path + 'mainfoot.tem'
+    with open(tempmain, 'w') as tpm :
+        # Write header
+            with open(mainhead, 'r') as mh :
+                for line in mh :
+                    tpm.write(line)
+            texline = '\include{' + timestamp + '}'
+            tpm.write(texline)
+            with open(mainfoot, 'r') as mf :
+                for line in mf :
+                    tpm.write(line)
+
+
+def get_fulltex_diary_entry(diaryprefs, passphrase, iv) :
+    maindata = diaryprefs.diary_path + 'maindata.lst'
+    timestamp = extract_time_file_name()
+    diary_file = diaryprefs.diary_path + timestamp + '.tex'
+    diary_crypt = diaryprefs.diary_path + timestamp + '.txc'
+    tempmain= diaryprefs.diary_path + 'tempmain.tex'
+    tempmainpdf= diaryprefs.diary_path + 'tempmain.pdf'
+
+    print "Writing in:", diary_file
+
+    heading = '\\section{' + extract_time_header() + '}\n'
+    with open(diary_file, 'a') as df :
+        df.write(heading)
+
+    create_temp_main(diaryprefs, timestamp)
+
+    curr_dir = os.getcwd()
+    os.chdir(diaryprefs.diary_path)
+    run_command(["fulltex", tempmain])
+    run_command(["fulltex", "+synctex", tempmain])
+    os.chdir(curr_dir)
+
+    with open(maindata, 'a') as md :
+        md.write(timestamp + '\n')
+
+    encrypt_file(diary_file, diary_crypt, passphrase, iv)
+    os.remove(diary_file)
+    os.remove(tempmain)
+    os.remove(tempmainpdf)
+
+
 
 def compile_main_file(diaryprefs, passphrase, iv) :
     maindata = diaryprefs.diary_path + 'maindata.lst'
@@ -219,12 +267,42 @@ def compile_main_file(diaryprefs, passphrase, iv) :
             fn = fn.strip()
             os.remove(diaryprefs.diary_path + fn + '.tex')
 
-
-def show_main_file(diaryprefs) :
     pdffile = diaryprefs.diary_path + 'main.pdf'
+    pdfcryp = diaryprefs.diary_path + 'main.pdc'
+    encrypt_file(pdffile, pdfcryp, passphrase, iv)
+    os.remove(pdffile)
+
+
+def show_main_file(diaryprefs, passphrase, iv) :
+    pdffile = diaryprefs.diary_path + 'main.pdf'
+    pdfcryp = diaryprefs.diary_path + 'main.pdc'
+    decrypt_file(pdfcryp, pdffile, passphrase, iv)
     run_command(['zathura', pdffile])
     os.remove(pdffile)
 
+def usual_entry(diaryprefs, passphrase, iv) :
+    check_and_create_main(dp)
+    get_diary_entry(dp, pp, iv)
+    check_and_create_main(dp)
+    compile_main_file(dp, pp, iv)
+    show_main_file(dp, pp, iv)
+
+def fulltex_entry(diaryprefs, passphrase, iv) :
+    check_and_create_main(dp)
+    get_fulltex_diary_entry(dp, pp, iv)
+    check_and_create_main(dp)
+    compile_main_file(dp, pp, iv)
+    show_main_file(dp, pp, iv)
+
+def printhelp() :
+    print """
+        Diary is a simple diary software.
+        Syntax:
+           $ diary [cmd]
+        cmd can be one of:
+           fulltex : invoke fulltex +synctex for compilation.
+           show : show the old pdf file.
+    """
 
 dp = Diary_Prefs(edit='vim')
 
@@ -232,9 +310,17 @@ iv = 'These are great ciphers. Do you use them? You should.'
 iv = iv[4:20]
 pp = raw_input('passphrase: ')
 
-check_and_create_main(dp)
-get_diary_entry(dp, pp, iv)
-check_and_create_main(dp)
-compile_main_file(dp, pp, iv)
-show_main_file(dp)
+if len(sys.argv) == 1 :
+    usual_entry(dp, pp, iv)
+else :
+    if len(sys.argv) >= 3 :
+        printhelp()
+    else :
+        cmd = sys.argv[1]
+        if cmd == 'fulltex' :
+            fulltex_entry(dp, pp, iv)
+        elif cmd == 'show' :
+            show_main_file(dp, pp, iv)
+        else :
+            printhelp()
 
